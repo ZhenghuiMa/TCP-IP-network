@@ -24,6 +24,7 @@
 //Add
 #include <sys/select.h>
 #include <sys/time.h>
+#include <signal.h>
 
 
 #define ECHOMAX 10000     /* Longest string to echo */

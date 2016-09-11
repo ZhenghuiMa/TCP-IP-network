@@ -13,34 +13,40 @@
 *********************************************************/
 #include "UDPEcho.h"
 #include <netdb.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <time.h>
+
+typedef struct token_buffer {
+  size_t bucketSize;
+  size_t tokenSize;
+  double rate;
+  uint64_t timestamp;
+
+} token_buffer;
 
 void clientCNTCCode();
 void CatchAlarm(int ignored);
 int numberOfTimeOuts=0;
 int numberOfTrials;
 long totalPing;
-long totalNumber;
-long minRTT;
-long maxRTT;
-long totalRTT;
-unsigned int size;
 int bStop;
-short mode;
 
 
-struct timeval *theTime3;
-struct timeval *theTime4;
-struct timeval TV3, TV4;
+struct token_buffer {
+  size_t bucketSize;
+  size_t tokenSize;
+  double rate;
+  uint64_t timestamp;
+
+};
 
 struct Datagram
 {
   short mode;
   short messageSize;
   unsigned int seqNum;
-  char rem[1];
 };
 
 char Version[] = "1.1";   
@@ -58,8 +64,7 @@ int main(int argc, char *argv[])
     int echoStringLen;               /* Length of string to echo */
     int respStringLen;               /* Length of received response */
     struct hostent *thehost;       /* Hostent from gethostbyname() */
-    double delay;                /* Iteration delay in seconds */
-    int packetSize;                  /* PacketSize*/
+    int delay, packetSize;  /* Iteration delay in seconds, packetSize*/
     struct timeval *theTime1;
     struct timeval *theTime2;
     struct timeval TV1, TV2;
@@ -69,24 +74,15 @@ int main(int argc, char *argv[])
     int *seqNumberPtr;
     unsigned int seqNumber = 1;
     unsigned int RxSeqNumber = 1;
-    struct timespec reqDelay, remDelay;
-    int nIterations;
-    //long avgPing, loss;
-    long timeRTT;
 
     struct Datagram datagram;
-    //struct token_buffer *tb;
 
     unsigned int averageRate;
     unsigned int bucketSize;
     unsigned int tokenSize;
     unsigned int messageSize;
-    unsigned int container;
     short mode;
     short debugFlag;
-
-    theTime3 = &TV3;
-    theTime4 = &TV4;
 
     theTime1 = &TV1;
     theTime2 = &TV2;
@@ -107,57 +103,127 @@ int main(int argc, char *argv[])
 
     servIP = argv[1];           /* First arg: server IP address (dotted quad) */
 
-    echoServPort = atoi(argv[2]);
-    bucketSize = atoi(argv[4]);
-    tokenSize = atoi(argv[5]);
-    averageRate = atoi(argv[3]);
-    container = atoi(argv[4]);
-    messageSize = atoi(argv[6]);
-    mode = atoi(argv[7]);
-    nIterations = atoi(argv[8]);
-    debugFlag = atoi(argv[9]);
-    packetSize = 32;
-    delay = 0.1;
-
-    size = packetSize;
     /* get info from parameters , or default to defaults if they're not specified */
-    /*
     if (argc == 2) {
        echoServPort = 7;
        delay = 1.0;
+
+       averageRate = 1000000;
+       messageSize = 1472;
+       tokenSize = 4*messageSize;
+       bucketSize = tokenSize;
+       mode = 0;
+       debugFlag = 0;
+
        packetSize = 32;
-     nIterations = 1;
+       nIterations = 1;
     }
     else if (argc == 3) {
        echoServPort = atoi(argv[2]);
        delay = 1.0;
+
+       averageRate = atoi(argv[3]);
+       messageSize = 1472;
+       tokenSize = 4*messageSize;
+       bucketSize = tokenSize;
+       mode = 0;
+       debugFlag = 0;
+
        packetSize = 32;
-     nIterations = 1;
+       nIterations = 1;
     }
     else if (argc == 4) {
        echoServPort = atoi(argv[2]);
-       delay = atof(argv[3]);
+       delay = 0.1;
+
+       averageRate = atoi(argv[3]);
+       messageSize = 1472;
+       tokenSize = 4*messageSize;
+       bucketSize = atoi(argv[4]);
+       mode = 0;
+       debugFlag = 0;
+
        packetSize = 32;
        nIterations = 1;
     }
     else if (argc == 5) {
        echoServPort = atoi(argv[2]);
-       delay = atof(argv[3]);
-       packetSize = atoi(argv[4]);
+       delay = 0.1;
+
+       averageRate = atoi(argv[3]);
+       messageSize = 1472;
+       tokenSize = atoi(argv[5]);
+       bucketSize = atoi(argv[4]);
+       mode = 0;
+       debugFlag = 0;
+
+       packetSize = 32;
        if (packetSize > ECHOMAX)
          packetSize = ECHOMAX;
        nIterations = 1;
     }
     else if (argc == 6) {
       echoServPort = atoi(argv[2]);
-      delay = atof(argv[3]);
-      packetSize = atoi(argv[4]);
+      delay = 0.1;
+
+       averageRate = atoi(argv[3]);
+       messageSize = atoi(argv[6]);
+       tokenSize = atoi(argv[5]);
+       bucketSize = atoi(argv[4]);
+       mode = 0;
+       debugFlag = 0;
+
+      packetSize = 32;
       if (packetSize > ECHOMAX)
         packetSize = ECHOMAX;
-      nIterations = atoi(argv[5]);
-    }
-     */
+      nIterations = 1;
+    }else if (argc == 7) {
+      echoServPort = atoi(argv[2]);
+      delay = 0.1;
 
+       averageRate = atoi(argv[3]);
+       messageSize = atoi(argv[6]);
+       tokenSize = atoi(argv[5]);
+       bucketSize = atoi(argv[4]);
+       mode = atoi(argv[7]);
+       debugFlag = 0;
+
+      packetSize = 32;
+      if (packetSize > ECHOMAX)
+        packetSize = ECHOMAX;
+      nIterations = 1;
+    }else if (argc == 8) {
+      echoServPort = atoi(argv[2]);
+      delay = 0.1;
+
+       averageRate = atoi(argv[3]);
+       messageSize = atoi(argv[6]);
+       tokenSize = atoi(argv[5]);
+       bucketSize = atoi(argv[4]);
+       mode = atoi(argv[7]);
+       debugFlag = 0;
+
+      packetSize = 32;
+      if (packetSize > ECHOMAX)
+        packetSize = ECHOMAX;
+      nIterations = atoi(argv[8]);
+    }else if (argc == 9) {
+      echoServPort = atoi(argv[2]);
+      delay = 0.1;
+
+       averageRate = atoi(argv[3]);
+       messageSize = atoi(argv[6]);
+       tokenSize = atoi(argv[5]);
+       bucketSize = atoi(argv[4]);
+       mode = atoi(argv[7]);
+       debugFlag = atoi(argv[9]);
+
+      packetSize = 32;
+      if (packetSize > ECHOMAX)
+        packetSize = ECHOMAX;
+      nIterations = atoi(argv[8]);
+    }
+       
     myaction.sa_handler = CatchAlarm;
     if (sigfillset(&myaction.sa_mask) < 0)
        DieWithError("sigfillset() failed");
@@ -179,6 +245,7 @@ int main(int argc, char *argv[])
     seqNumberPtr = (int *)echoString;
     echoString[packetSize-1]='\0';
 
+
     /* Construct the server address structure */
     memset(&echoServAddr, 0, sizeof(echoServAddr));    /* Zero out structure */
     echoServAddr.sin_family = AF_INET;                 /* Internet addr family */
@@ -191,28 +258,19 @@ int main(int argc, char *argv[])
     }
     
     echoServAddr.sin_port   = htons(echoServPort);     /* Server port */
-
-    datagram.mode = mode;
-    datagram.messageSize = messageSize;
-    datagram.seqNum = 1;
-
-    for (i=8; i<packetSize; i+=4) {
-       datagram.rem[i] = 0x31;
-       datagram.rem[i+1] = 0x32;
-       datagram.rem[i+2] = 0x33;
-       datagram.rem[i+3] = 0x34;
-    }
     
-    char * SendBuffer = (char *)malloc(sizeof(packetSize));
-    memcpy(SendBuffer, &datagram, sizeof(packetSize));
+    datagram.mode = 0x01;
+    datagram.messageSize = 0x01;
+    datagram.seqNum = 1;
+    
+    char * SendBuffer = (char *)malloc(sizeof(struct Datagram)+1);
+    memcpy(SendBuffer, &datagram, sizeof(datagram));
 
-    size = packetSize;
+  while (1) {
 
-    gettimeofday(theTime3, NULL);
+    if (bStop == 1) exit(0);
 
-  while (nIterations > 0 && bStop != 1) {
-
-    //*seqNumberPtr = htonl(seqNumber++); 
+    *seqNumberPtr = htonl(seqNumber++); 
 
     /* Create a datagram/UDP socket */
     if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
@@ -223,16 +281,13 @@ int main(int argc, char *argv[])
     //printf("UDPEchoClient: Send the string: %s to the server: %s \n", echoString,servIP);
     gettimeofday(theTime1, NULL);
 
-    datagram.seqNum = seqNumber++;
+    printf("Size check %d\n", sizeof(datagram));
 
-    //printf("Num %d \n", datagram.seqNum);
-
-    if (sendto(sock, SendBuffer, packetSize, 0, (struct sockaddr *)
-             &echoServAddr, sizeof(echoServAddr)) != echoStringLen)
-    DieWithError("sendto() sent a different number of bytes than expected");
-
-    bucketSize = bucketSize - tokenSize;  
-
+    if (sendto(sock, SendBuffer, (int)strlen(SendBuffer), 0, (struct sockaddr *)
+               &echoServAddr, sizeof(echoServAddr)) != echoStringLen)
+      DieWithError("sendto() sent a different number of bytes than expected");
+  
+    printf("End\n");
     /* Recv a response */
 
     fromSize = sizeof(fromAddr);
@@ -256,40 +311,24 @@ int main(int argc, char *argv[])
     usec2 = (theTime2->tv_sec) * 1000000 + (theTime2->tv_usec);
     usec1 = (theTime1->tv_sec) * 1000000 + (theTime1->tv_usec);
 
-    if(timeRTT>0)
-    {
-      minRTT = (usec2 - usec1) < timeRTT ? (usec2 - usec1) : timeRTT; 
-    
-    }else{
-
-      minRTT = 0;
-    }
-    
-    maxRTT = (usec2 - usec1) > timeRTT ? (usec2 - usec1) : timeRTT;
-
-    timeRTT = (usec2 - usec1);
-    totalRTT += timeRTT;
-    /*
+    curPing = (usec2 - usec1);
     printf("Ping(%d): %ld microseconds\n",RxSeqNumber,curPing);
 
     totalPing += curPing;
-    */
     numberOfTrials++;
-    totalNumber++;
-    
     close(sock);
     sleep(delay);
-    close(sock);
 
-    reqDelay.tv_sec = delay;
-    remDelay.tv_nsec = 0;
-    nanosleep((const struct timespec*)&reqDelay, &remDelay);
-
-    bucketSize = (bucketSize + (averageRate/8000000)*(usec2 - usec1)) > container ? container : (bucketSize + (averageRate/8000000)*(usec2 - usec1));
-
-    nIterations--;
   }
-  /*
+  exit(0);
+}
+
+void CatchAlarm(int ignored) { }
+
+void clientCNTCCode() {
+  long avgPing, loss;
+
+  bStop = 1;
   if (numberOfTrials != 0) 
     avgPing = (totalPing/numberOfTrials);
   else 
@@ -300,31 +339,37 @@ int main(int argc, char *argv[])
     loss = 0;
 
   printf("\nAvg Ping: %ld microseconds Loss: %ld Percent\n", avgPing, loss);
-  */
-  exit(0);
 }
 
-void CatchAlarm(int ignored) { }
+uint64_t time_now()
+{
+  struct timeval ts;
+  gettimeofday(&ts, NULL);
+  return (uint64_t)(ts.tv_sec * 1000 + ts.tv_usec/1000);
+}
 
-void clientCNTCCode() {
-  
-  bStop = 1;
+int token_buffer_init(token_buffer *tbf, size_t max_burst, size_t token, double rate)
+{
+  tbf->bucketSize = max_burst;
+  tbf->tokenSize   = token;
+  tbf->rate = rate;
+  tbf->timestamp = time_now();
+}
 
-  gettimeofday(theTime4, NULL);
+int token_buffer_consume(token_buffer *tbf, int bytes)
+{
+  uint64_t now = time_now();
+  size_t delta = (size_t)(tbf->rate * (now - tbf->timestamp));
+  tbf->tokenSize = (tbf->bucketSize < tbf->tokenSize+delta)?tbf->bucketSize:tbf->tokenSize+delta;
+  tbf->timestamp = now;
 
-  long time1 = theTime3->tv_sec;
-  long time2 = theTime4->tv_sec;
-  long timeval = time2 - time1;
+  fprintf(stdout, "TOKENS %d  bytes: %d\n", tbf->tokenSize, bytes);
 
-  long sentRate = (totalNumber * 8 * size)/timeval;
+  if(tbf->tokenSize > 0) {
+    tbf->tokenSize -= bytes;
+  } else {
+    return -1;
+  }
 
-  float min = minRTT/1000000;
-  float max = maxRTT/1000000;
-  float mean = totalRTT/(totalNumber*1000000);
-
-  printf("\n %ld %ld %f %f %f\n", totalNumber, sentRate, min, max, mean);
-
-  fflush(stdout);
-    
-  exit(0);
+  return 0;
 }

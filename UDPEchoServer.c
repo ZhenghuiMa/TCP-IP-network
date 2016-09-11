@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
 
                 memcpy(&datagram, echoBuffer, sizeof(datagram));
 
-                printf("Size: %d\n", datagram.messageSize);
+                //printf("Size: %d\n", datagram.messageSize);
 
                 //free(echoBuffer);
 
@@ -186,7 +186,7 @@ double ranRate()
 
 void serverCNTCCode() {
     //bStop = 1;
-    int i;
+    //int i;
 
     gettimeofday(theTime4, NULL);
 
