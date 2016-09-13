@@ -21,14 +21,8 @@
 #include <stdlib.h>     /* for atoi() and exit() */
 #include <unistd.h>     /* for close() */
 
-//Add
-#include <sys/select.h>
-#include <sys/time.h>
-#include <signal.h>
-
 
 #define ECHOMAX 10000     /* Longest string to echo */
-
 
 #ifndef LINUX
 #define INADDR_NONE  0xffffffff
