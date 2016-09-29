@@ -152,9 +152,9 @@ case IPPROTO_ICMP:
 
 {
 
-const struct icmp_hdr *sniff_icmp = (struct icmp_hdr*)(packet+SIZE_ETHERNET+size_ip);
+const struct icmp_hdr *icmp_header = (struct icmp_hdr*)(packet+SIZE_ETHERNET+size_ip);
 
-if(sniff_icmp->type==8)
+if(icmp_header->type==8)
 
 {
 
@@ -168,7 +168,7 @@ printf("       Sender: %s\n", inet_ntoa(sniff_ip->ip_src));
 
 printf("         Receiver: %s\n", inet_ntoa(sniff_ip->ip_dst));
 
-ping_func(sniff_ip, packet, size_ip, count, sniff_icmp->id, sniff_icmp->seq);
+ping_func(sniff_ip, packet, size_ip, count, icmp_header->id, icmp_header->seq);
 
 }
 
@@ -207,17 +207,15 @@ const struct ethernet_hdr *ethernet;
 
 ethernet = (struct ethernet_hdr*)(packet);
 
-int s, i;
-
-struct ip_hdr *spoof_ip = (struct ip_hdr*)(buf+SIZE_ETHERNET);
-
-struct icmp_hdr *spoof_icmp = (struct icmp_hdr*)(buf+size_ip+SIZE_ETHERNET);
+int socket, i, on;
 
 struct hostent *hp, *hp2;
 
 struct sockaddr_in dst;
 
-int on;
+struct ip_hdr *ip_spoof = (struct ip_hdr*)(buf+SIZE_ETHERNET);
+
+struct icmp_hdr *spoof_icmp = (struct icmp_hdr*)(buf+size_ip+SIZE_ETHERNET);
 
 int offset = 0;
 
@@ -227,7 +225,7 @@ bzero(buf, sizeof(buf));
 
 /* Create RAW socket */
 
-if((s = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
+if((socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
 
 {
 
@@ -241,7 +239,7 @@ exit(1);
 
 /* socket options, tell the kernel we provide the IP structure */
 
-if(setsockopt(s, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0)
+if(setsockopt(socket, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0)
 
 {
 
@@ -257,27 +255,27 @@ printf(" %s\n", inet_ntoa(sniff_ip->ip_dst));
 
 /* Ip structure, check the ip.h */
 
-spoof_ip->ip_vhl = sniff_ip->ip_vhl;
+ip_spoof->ip_vhl = sniff_ip->ip_vhl;
 
-spoof_ip->ip_tos = sniff_ip->ip_tos;
+ip_spoof->ip_tos = sniff_ip->ip_tos;
 
-spoof_ip->ip_len = sniff_ip->ip_len;
+ip_spoof->ip_len = sniff_ip->ip_len;
 
-spoof_ip->ip_id = id;
+ip_spoof->ip_id = id;
 
-spoof_ip->ip_off = sniff_ip->ip_off;
+ip_spoof->ip_off = sniff_ip->ip_off;
 
-spoof_ip->ip_ttl = sniff_ip->ip_ttl;
+ip_spoof->ip_ttl = sniff_ip->ip_ttl;
 
-spoof_ip->ip_p = sniff_ip->ip_p;
+ip_spoof->ip_p = sniff_ip->ip_p;
 
-spoof_ip->ip_sum =  sniff_ip->ip_sum;
+ip_spoof->ip_sum =  sniff_ip->ip_sum;
 
-spoof_ip->ip_src = sniff_ip->ip_dst;
+ip_spoof->ip_src = sniff_ip->ip_dst;
 
-spoof_ip->ip_dst = sniff_ip->ip_src;
+ip_spoof->ip_dst = sniff_ip->ip_src;
 
-dst.sin_addr = spoof_ip->ip_dst;
+dst.sin_addr = ip_spoof->ip_dst;
 
 dst.sin_family = AF_INET;
 
@@ -307,7 +305,7 @@ printf("send successfully.\n");
 
 /* close socket */
 
-close(s);
+close(socket);
 
 }
 
