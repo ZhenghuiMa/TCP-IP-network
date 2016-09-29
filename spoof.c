@@ -100,214 +100,9 @@ unsigned short seq;       //icmp packet sequent
 
 };
 
-void capture_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
+void ping_func(struct ip_hdr *sniff_ip, const u_char *packet, int size_ip, int count, int id, int seq);
 
-{
-
-static int count = 1;	/* number of packets*/ 
-
-const struct ethernet_hdr *ethernet;
-
-const struct ip_hdr *sniff_ip;
-
-int size_ip;
-
-int size_tcp;
-
-int size_payload;
-
-/* define ethernet header */
-
-ethernet = (struct ethernet_hdr*)(packet);
-
-/* define offset */
-
-sniff_ip = (struct ip_hdr*)(packet + SIZE_ETHERNET);
-
-size_ip = IP_HL(sniff_ip)*4;
-
-if (size_ip < 20) {
-
-	printf("Length is invalid: %u bytes\n", size_ip);
-
-	return;
-
-}
-
-switch(sniff_ip->ip_p) {
-
-case IPPROTO_TCP:
-
-printf("   Protocol: TCP\n");
-
-break;
-
-case IPPROTO_UDP:
-
-printf("   Protocol: UDP\n");
-
-return;
-
-case IPPROTO_ICMP:
-
-{
-
-const struct icmp_hdr *icmp_header = (struct icmp_hdr*)(packet+SIZE_ETHERNET+size_ip);
-
-if(icmp_header->type==8)
-
-{
-
-printf("\nNumber of packets %d:\n", count);
-
-count++;
-
-printf("   Protocol: ICMP\n");
-
-printf("       Sender: %s\n", inet_ntoa(sniff_ip->ip_src));
-
-printf("         Receiver: %s\n", inet_ntoa(sniff_ip->ip_dst));
-
-ping_func(sniff_ip, packet, size_ip, count, icmp_header->id, icmp_header->seq);
-
-}
-
-return;
-
-}
-
-case IPPROTO_IP:
-
-printf("   Protocol: IP\n");
-
-return;
-
-default:
-
-printf("   Protocol: unknown\n");
-
-return;
-
-}
-
-return;
-
-}
-
-/* 
-* Description:  pingFunc function create ICMP reply and send back
-*/
-void ping_func(struct ip_hdr *sniff_ip, const u_char *packet, int size_ip, int count, int id, int seq)
-
-{
-
-char buf[size_ip+SIZE_ETHERNET];
-
-const struct ethernet_hdr *ethernet;
-
-ethernet = (struct ethernet_hdr*)(packet);
-
-int socket, i, on;
-
-struct hostent *hp, *hp2;
-
-struct sockaddr_in dst;
-
-struct ip_hdr *ip_spoof = (struct ip_hdr*)(buf+SIZE_ETHERNET);
-
-struct icmp_hdr *spoof_icmp = (struct icmp_hdr*)(buf+size_ip+SIZE_ETHERNET);
-
-int offset = 0;
-
-on = 1;
-
-bzero(buf, sizeof(buf));
-
-/* Create RAW socket */
-
-if((socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
-
-{
-
-perror("socket() error");
-
-/* If something wrong, just exit */
-
-exit(1);
-
-}
-
-/* socket options, tell the kernel we provide the IP structure */
-
-if(setsockopt(socket, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0)
-
-{
-
-perror("setsockopt() for IP_HDRINCL error");
-
-exit(1);
-
-}
-
-printf("To %s from spoofing", inet_ntoa(sniff_ip->ip_dst));
-
-printf(" %s\n", inet_ntoa(sniff_ip->ip_dst));
-
-/* Ip structure, check the ip.h */
-
-ip_spoof->ip_vhl = sniff_ip->ip_vhl;
-
-ip_spoof->ip_tos = sniff_ip->ip_tos;
-
-ip_spoof->ip_len = sniff_ip->ip_len;
-
-ip_spoof->ip_id = id;
-
-ip_spoof->ip_off = sniff_ip->ip_off;
-
-ip_spoof->ip_ttl = sniff_ip->ip_ttl;
-
-ip_spoof->ip_p = sniff_ip->ip_p;
-
-ip_spoof->ip_sum =  sniff_ip->ip_sum;
-
-ip_spoof->ip_src = sniff_ip->ip_dst;
-
-ip_spoof->ip_dst = sniff_ip->ip_src;
-
-dst.sin_addr = ip_spoof->ip_dst;
-
-dst.sin_family = AF_INET;
-
-spoof_icmp->type = 0;
-
-spoof_icmp->code = 0;
-
-spoof_icmp->checksum = 0;
-
-spoof_icmp->id = id;
-
-spoof_icmp->seq = seq;
-
-if(sendto(s, buf, sizeof(buf), 0, (struct sockaddr *)&dst, sizeof(dst)) < 0)
-
-{
-
-fprintf(stderr, "offset %d: ", offset);
-
-perror("sendto() error");
-
-}
-
-else
-
-printf("send successfully.\n");
-
-/* close socket */
-
-close(socket);
-
-}
+void capture_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
 
 int main(int argc, char **argv)
 
@@ -450,3 +245,213 @@ printf("\nCapture complete.\n");
 return 0;
 
 }
+
+void capture_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
+
+{
+
+static int count = 1;	/* number of packets*/ 
+
+const struct ethernet_hdr *ethernet;
+
+const struct ip_hdr *sniff_ip;
+
+int size_ip;
+
+int size_tcp;
+
+int size_payload;
+
+/* define ethernet header */
+
+ethernet = (struct ethernet_hdr*)(packet);
+
+/* define offset */
+
+sniff_ip = (struct ip_hdr*)(packet + SIZE_ETHERNET);
+
+size_ip = IP_HL(sniff_ip)*4;
+
+if (size_ip < 20) {
+
+	printf("Length is invalid: %u bytes\n", size_ip);
+
+	return;
+
+}
+
+switch(sniff_ip->ip_p) {
+
+case IPPROTO_TCP:
+
+printf("   Protocol: TCP\n");
+
+break;
+
+case IPPROTO_UDP:
+
+printf("   Protocol: UDP\n");
+
+return;
+
+case IPPROTO_ICMP:
+
+{
+
+const struct icmp_hdr *icmp_header = (struct icmp_hdr*)(packet+SIZE_ETHERNET+size_ip);
+
+if(icmp_header->type==8)
+
+{
+
+printf("\nNumber of packets %d:\n", count);
+
+count++;
+
+printf("   Protocol: ICMP\n");
+
+printf("       Sender: %s\n", inet_ntoa(sniff_ip->ip_src));
+
+printf("         Receiver: %s\n", inet_ntoa(sniff_ip->ip_dst));
+
+ping_func(sniff_ip, packet, size_ip, count, icmp_header->id, icmp_header->seq);
+
+}
+
+return;
+
+}
+
+case IPPROTO_IP:
+
+printf("   Protocol: IP\n");
+
+return;
+
+default:
+
+printf("   Protocol: unknown\n");
+
+return;
+
+}
+
+return;
+
+}
+
+/* 
+* Description:  pingFunc function create ICMP reply and send back
+*/
+void ping_func(struct ip_hdr *sniff_ip, const u_char *packet, int size_ip, int count, int id, int seq)
+
+{
+
+char buf[size_ip+SIZE_ETHERNET];
+
+const struct ethernet_hdr *ethernet;
+
+ethernet = (struct ethernet_hdr*)(packet);
+
+int raw_socket, i, on;
+
+struct hostent *hp, *hp2;
+
+struct sockaddr_in dst;
+
+struct ip_hdr *ip_spoof = (struct ip_hdr*)(buf+SIZE_ETHERNET);
+
+struct icmp_hdr *spoof_icmp = (struct icmp_hdr*)(buf+size_ip+SIZE_ETHERNET);
+
+int offset = 0;
+
+on = 1;
+
+bzero(buf, sizeof(buf));
+
+/* Create RAW socket */
+
+if((raw_socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
+
+{
+
+perror("socket() error");
+
+/* If something wrong, just exit */
+
+exit(1);
+
+}
+
+/* socket options, tell the kernel we provide the IP structure */
+
+if(setsockopt(raw_socket, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0)
+
+{
+
+perror("setsockopt() for IP_HDRINCL error");
+
+exit(1);
+
+}
+
+printf("To %s from spoofing", inet_ntoa(sniff_ip->ip_dst));
+
+printf(" %s\n", inet_ntoa(sniff_ip->ip_dst));
+
+/* Ip structure, check the ip.h */
+
+ip_spoof->ip_vhl = sniff_ip->ip_vhl;
+
+ip_spoof->ip_tos = sniff_ip->ip_tos;
+
+ip_spoof->ip_len = sniff_ip->ip_len;
+
+ip_spoof->ip_id = id;
+
+ip_spoof->ip_off = sniff_ip->ip_off;
+
+ip_spoof->ip_ttl = sniff_ip->ip_ttl;
+
+ip_spoof->ip_p = sniff_ip->ip_p;
+
+ip_spoof->ip_sum =  sniff_ip->ip_sum;
+
+ip_spoof->ip_src = sniff_ip->ip_dst;
+
+ip_spoof->ip_dst = sniff_ip->ip_src;
+
+dst.sin_addr = ip_spoof->ip_dst;
+
+dst.sin_family = AF_INET;
+
+spoof_icmp->type = 0;
+
+spoof_icmp->code = 0;
+
+spoof_icmp->checksum = 0;
+
+spoof_icmp->id = id;
+
+spoof_icmp->seq = seq;
+
+if(sendto(raw_socket, buf, sizeof(buf), 0, (struct sockaddr *)&dst, sizeof(dst)) < 0)
+
+{
+
+fprintf(stderr, "offset %d: ", offset);
+
+perror("sendto() error");
+
+}
+
+else
+
+printf("send successfully.\n");
+
+/* close socket */
+
+close(raw_socket);
+
+}
+
