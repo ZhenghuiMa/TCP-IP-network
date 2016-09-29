@@ -1,3 +1,6 @@
+/* 
+*  Sniff and spoof icmp packet for program 8
+*/
 #include <pcap.h>
 
 #include <stdio.h>
@@ -10,15 +13,15 @@
 
 #include <errno.h>
 
+#include <arpa/inet.h>
+
 #include <sys/types.h>
 
 #include <sys/socket.h>
 
-#include <netinet/in.h>
-
-#include <arpa/inet.h>
-
 #include <netdb.h>
+
+#include <netinet/in.h>
 
 #include <netinet/in_systm.h>
 
@@ -80,10 +83,7 @@ struct  in_addr ip_dst;    /* dest address */
 
 #define IP_V(ip)                (((ip)->ip_vhl) >> 4)
 
-// Description:  icmp header, according to the structure of icmp header, I define a struct icmp_hdr
-
-// the icmp structure is shown in Figure 8.1 below.
-
+/* Here we construct ICMP header*/
 /* ICMP header */
 
 struct icmp_hdr {
@@ -100,19 +100,106 @@ unsigned short seq;       //icmp packet sequent
 
 };
 
-// Description:  myping function, I used this function when capture a ICMP request packet,
-
-// this function can create a ICMP reply socket and send it back to the source of the ICMP request packet
-
-// argument argIP is received ip header
-
-// argument packet is received packet
-
-void myping(struct ip_hdr *sniff_ip, const u_char *packet, int size_ip, int count, int id, int seq)
+void capture_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
 
 {
 
-// Don’t miss the Ethernet header.
+static int count = 1;	/* number of packets*/ 
+
+const struct ethernet_hdr *ethernet;
+
+const struct ip_hdr *sniff_ip;
+
+int size_ip;
+
+int size_tcp;
+
+int size_payload;
+
+/* define ethernet header */
+
+ethernet = (struct ethernet_hdr*)(packet);
+
+/* define offset */
+
+sniff_ip = (struct ip_hdr*)(packet + SIZE_ETHERNET);
+
+size_ip = IP_HL(sniff_ip)*4;
+
+if (size_ip < 20) {
+
+	printf("Length is invalid: %u bytes\n", size_ip);
+
+	return;
+
+}
+
+switch(sniff_ip->ip_p) {
+
+case IPPROTO_TCP:
+
+printf("   Protocol: TCP\n");
+
+break;
+
+case IPPROTO_UDP:
+
+printf("   Protocol: UDP\n");
+
+return;
+
+case IPPROTO_ICMP:
+
+{
+
+const struct icmp_hdr *sniff_icmp = (struct icmp_hdr*)(packet+SIZE_ETHERNET+size_ip);
+
+if(sniff_icmp->type==8)
+
+{
+
+printf("\nNumber of packets %d:\n", count);
+
+count++;
+
+printf("   Protocol: ICMP\n");
+
+printf("       Sender: %s\n", inet_ntoa(sniff_ip->ip_src));
+
+printf("         Receiver: %s\n", inet_ntoa(sniff_ip->ip_dst));
+
+ping_func(sniff_ip, packet, size_ip, count, sniff_icmp->id, sniff_icmp->seq);
+
+}
+
+return;
+
+}
+
+case IPPROTO_IP:
+
+printf("   Protocol: IP\n");
+
+return;
+
+default:
+
+printf("   Protocol: unknown\n");
+
+return;
+
+}
+
+return;
+
+}
+
+/* 
+* Description:  pingFunc function create ICMP reply and send back
+*/
+void ping_func(struct ip_hdr *sniff_ip, const u_char *packet, int size_ip, int count, int id, int seq)
+
+{
 
 char buf[size_ip+SIZE_ETHERNET];
 
@@ -164,7 +251,7 @@ exit(1);
 
 }
 
-printf("Sending to %s from spoofed", inet_ntoa(sniff_ip->ip_dst));
+printf("To %s from spoofing", inet_ntoa(sniff_ip->ip_dst));
 
 printf(" %s\n", inet_ntoa(sniff_ip->ip_dst));
 
@@ -216,191 +303,11 @@ perror("sendto() error");
 
 else
 
-printf("sendto() is OK.\n");
+printf("send successfully.\n");
 
 /* close socket */
 
 close(s);
-
-}
-
-// We can use this function to modify the original packet.
-
-void myping2(struct ip_hdr *sniff_ip, char *packet, struct icmp_hdr *spoof_icmp, int size_ethernet, int size_ip)
-
-{
-
-int s;
-
-int on = 1;
-
-struct sockaddr_in dst;
-
-/* Create RAW socket */
-
-if((s = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
-
-{
-
-perror("socket() error");
-
-/* If something wrong, just exit */
-
-exit(1);
-
-}
-
-/* socket options, tell the kernel we provide the IP structure */
-
-if(setsockopt(s, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0)
-
-{
-
-perror("setsockopt() for IP_HDRINCL error");
-
-exit(1);
-
-}
-
-printf("Sending to %s from spoofed", inet_ntoa(sniff_ip->ip_dst));
-
-printf(" %s\n", inet_ntoa(sniff_ip->ip_dst));
-
-/* Ip structure, check the ip.h */
-
-struct  in_addr tmp = sniff_ip->ip_src;
-
-sniff_ip->ip_src = sniff_ip->ip_dst;
-
-sniff_ip->ip_dst = tmp;
-
-dst.sin_addr = sniff_ip->ip_dst;
-
-dst.sin_family = AF_INET;
-
-spoof_icmp->type = 0;
-
-if(sendto(s, packet, sizeof(packet), 0, (struct sockaddr *)&dst, sizeof(dst)) < 0)
-
-{
-
-fprintf(stderr, "offset %d: ", 0);
-
-perror("sendto() error");
-
-}
-
-else
-
-printf("sendto() is OK.\n");
-
-/* close socket */
-
-close(s);
-
-}
-
-// Description: I modified this function. Since we only care about ICMP packet, I modified this function so // that it only deals with ICMP request packet
-
-void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
-
-{
-
-static int count = 1;                   /* packet counter */
-
-/* declare pointers to packet headers */
-
-const struct ethernet_hdr *ethernet;  /* The ethernet header [1] */
-
-const struct ip_hdr *sniff_ip;              /* The IP header */
-
-int size_ip;
-
-int size_tcp;
-
-int size_payload;
-
-/* define ethernet header */
-
-ethernet = (struct ethernet_hdr*)(packet);
-
-/* define/compute ip header offset */
-
-sniff_ip = (struct ip_hdr*)(packet + SIZE_ETHERNET);
-
-size_ip = IP_HL(sniff_ip)*4;
-
-if (size_ip < 20) {
-
-printf("   * Invalid IP header length: %u bytes\n", size_ip);
-
-return;
-
-}
-
-/* determine protocol */
-
-switch(sniff_ip->ip_p) {
-
-case IPPROTO_TCP:
-
-printf("   Protocol: TCP\n");
-
-break;
-
-case IPPROTO_UDP:
-
-printf("   Protocol: UDP\n");
-
-return;
-
-case IPPROTO_ICMP:
-
-{
-
-const struct icmp_hdr *sniff_icmp = (struct icmp_hdr*)(packet+SIZE_ETHERNET+size_ip);
-
-if(sniff_icmp->type==8)
-
-{
-
-// Description:  if received packet protocol is ICMP, try to find if it is ICMP request (type = 8)
-
-// if it is ICMP request, call myping function to send ICMP reply with spoofed IP address
-
-printf("\nPacket number %d:\n", count);
-
-count++;
-
-printf("       From: %s\n", inet_ntoa(sniff_ip->ip_src));
-
-printf("         To: %s\n", inet_ntoa(sniff_ip->ip_dst));
-
-printf("   Protocol: ICMP\n");
-
-myping(sniff_ip, packet, size_ip, count, sniff_icmp->id, sniff_icmp->seq);
-
-}
-
-return;
-
-}
-
-case IPPROTO_IP:
-
-printf("   Protocol: IP\n");
-
-return;
-
-default:
-
-printf("   Protocol: unknown\n");
-
-return;
-
-}
-
-return;
 
 }
 
@@ -532,7 +439,7 @@ exit(EXIT_FAILURE);
 
 /* now we can set our callback function */
 
-pcap_loop(handle, num_packets, got_packet, NULL);
+pcap_loop(handle, num_packets, capture_packet, NULL);
 
 /* cleanup */
 
