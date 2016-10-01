@@ -1,0 +1,76 @@
+include Make.defines
+
+PROGS =	 perfClient perfServer
+
+OPTIONS = -DUNIX  -DANSI
+
+
+COBJECTS =	DieWithError.o 
+CSOURCES =	DieWithError.c 
+
+CPLUSOBJECTS = 
+
+COMMONSOURCES =
+
+CPLUSSOURCES =
+
+all:	${PROGS}
+
+
+perfClient:		perfClient.o $(CPLUSOBJECTS) $(COBJECTS) $(LIBS) $(COMMONSOURCES) $(SOURCES)
+		${CC} ${LINKOPTIONS}  $@ perfClient.o $(CPLUSOBJECTS) $(COBJECTS) $(LIBS) $(LINKFLAGS)
+
+perfServer:		perfServer.o $(CPLUSOBJECTS) $(COBJECTS)
+		${CC} ${LINKOPTIONS} $@ perfServer.o $(CPLUSOBJECTS) $(COBJECTS) $(LIBS) $(LINKFLAGS)
+
+
+.cc.o:	$(HEADERS)
+	$(CPLUS) $(CPLUSFLAGS) $(OPTIONS) $<
+
+.c.o:	$(HEADERS)
+	$(CC) $(CFLAGS) $(OPTIONS) $<
+
+
+
+backup:
+	rm -f perfTool.tar
+	rm -f perfTool.tar.gz
+	tar -cf perfTool.tar *
+	gzip -f perfTool.tar
+
+clean:
+		rm -f ${PROGS} ${CLEANFILES}
+
+depend:
+		makedepend UDPEchoClient1.c perfClient.c perfServer.c $(CFLAGS) $(HEADERS) $(SOURCES) $(COMMONSOURCES) $(CSOURCES)
+#		mkdep $(CFLAGS) $(HEADERS) $(SOURCES) $(COMMONSOURCES) $(CSOURCES)
+
+
+# DO NOT DELETE
+
+perfClient.o: UDPEcho.h /usr/include/arpa/inet.h /usr/include/features.h
+perfClient.o: /usr/include/stdc-predef.h /usr/include/netinet/in.h
+perfClient.o: /usr/include/stdint.h /usr/include/endian.h
+perfClient.o: /usr/include/errno.h /usr/include/fcntl.h /usr/include/limits.h
+perfClient.o: /usr/include/math.h /usr/include/netdb.h
+perfClient.o: /usr/include/rpc/netdb.h /usr/include/signal.h
+perfClient.o: /usr/include/time.h /usr/include/stdio.h /usr/include/libio.h
+perfClient.o: /usr/include/_G_config.h /usr/include/wchar.h
+perfClient.o: /usr/include/stdlib.h /usr/include/alloca.h
+perfClient.o: /usr/include/string.h /usr/include/unistd.h
+perfClient.o: /usr/include/getopt.h
+perfServer.o: UDPEcho.h /usr/include/arpa/inet.h /usr/include/features.h
+perfServer.o: /usr/include/stdc-predef.h /usr/include/netinet/in.h
+perfServer.o: /usr/include/stdint.h /usr/include/endian.h
+perfServer.o: /usr/include/errno.h /usr/include/fcntl.h /usr/include/limits.h
+perfServer.o: /usr/include/math.h /usr/include/netdb.h
+perfServer.o: /usr/include/rpc/netdb.h /usr/include/signal.h
+perfServer.o: /usr/include/time.h /usr/include/stdio.h /usr/include/libio.h
+perfServer.o: /usr/include/_G_config.h /usr/include/wchar.h
+perfServer.o: /usr/include/stdlib.h /usr/include/alloca.h
+perfServer.o: /usr/include/string.h /usr/include/unistd.h
+perfServer.o: /usr/include/getopt.h
+DieWithError.o: /usr/include/stdio.h /usr/include/features.h
+DieWithError.o: /usr/include/stdc-predef.h /usr/include/libio.h
+DieWithError.o: /usr/include/_G_config.h /usr/include/wchar.h
+DieWithError.o: /usr/include/stdlib.h /usr/include/alloca.h
